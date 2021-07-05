@@ -33,12 +33,12 @@ class Logger
     private $url;
 
     /**
-     * @ORM\Column(type="string", length=10)
+     * @ORM\Column(type="smallint")
      */
     private $responseCode;
 
     /**
-     * @ORM\Column(type="text")
+     * @ORM\Column(type="blob", nullable=true)
      */
     private $responseBody;
 
@@ -83,12 +83,12 @@ class Logger
         return $this;
     }
 
-    public function getResponseCode(): ?string
+    public function getResponseCode(): int
     {
         return $this->responseCode;
     }
 
-    public function setResponseCode(string $responseCode): self
+    public function setResponseCode(int $responseCode): self
     {
         $this->responseCode = $responseCode;
 
@@ -100,7 +100,7 @@ class Logger
         return $this->responseBody;
     }
 
-    public function setResponseBody(string $responseBody): self
+    public function setResponseBody(?string $responseBody): self
     {
         $this->responseBody = $responseBody;
 

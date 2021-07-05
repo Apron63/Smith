@@ -9,6 +9,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 /**
  * @ORM\Entity(repositoryClass=NewsRepository::class)
+ * @ORM\Table(name="news", indexes={
+ *     @ORM\Index(name="idx_guid", columns={"guid"})
+ * })
  */
 class News
 {

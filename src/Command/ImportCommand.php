@@ -23,8 +23,8 @@ class ImportCommand extends Command
     private OutputInterface $output;
     /** @var XMLReader */
     private XMLReader $reader;
-    /** @var resource $logger */
-    private $logger;
+
+    private string $method = 'GET';
 
     /**
      * ImportCommand constructor.
@@ -61,54 +61,33 @@ class ImportCommand extends Command
         $this->output = $output;
         $this->output->writeln('Начинаем импорт данных...');
 
+        $result = $this->getContent($this->defaultUrl);
         $logger = new Logger();
+        $logger
+            ->setMoment(new DateTime())
+            ->setUrl($this->defaultUrl)
+            ->setMethod($this->method)
+            ->setResponseCode($result['responseCode'])
+            ->setResponseBody($result['responseBody']);
+        $this->em->persist($logger);
+        $this->em->flush();
 
-        if (null === $content = $this->getContent($this->defaultUrl)) {
+        if (null === $result['content']) {
             $this->output->writeln('Невозможно загрузить контент...');
             return Command::FAILURE;
         }
 
-        $this->parseContent($content);
-
-
-        //$content = file_get_contents('http://static.feed.rbc.ru/rbc/logical/footer/news.rss');
-
-
-//        $this->logger = fopen($_ENV['APP_FULL_PATH'] . '/var/log/import-' . date('d-m-Y_H-i-s') . '.log', 'wb');
-//        fwrite($this->logger, date('d-m-Y H:i:s') . ' Старт импорта...' . PHP_EOL);
-//
-//        // Read City and Metro in memory array.
-//        $this->prepareData();
-//
-//        $allProviders = $this->em->getRepository(Provider::class)
-//            ->getProviderForImport();
-//
-//        /** @var Provider $provider */
-//        foreach ($allProviders as $provider) {
-//            fwrite($this->logger, date('d-m-Y H:i:s') . ' Провайдер: ' . $provider->getCompany()->getName() . PHP_EOL);
-//            $this->importFeed($provider);
-//        }
-//
-//        $this->output->writeln('Импорт завершен.');
-//
-//        if ($cacheDriver = $this->em->getConfiguration()->getResultCacheImpl()) {
-//            $result = $cacheDriver->deleteAll();
-//            $message = ($result) ? 'Кэш сброшен' : 'Ошибка очистки кэша';
-//            $this->output->writeln($message);
-//            fwrite($this->logger, date('d-m-Y H:i:s') . ' ' . $message . PHP_EOL);
-//        }
-//
-//        fclose($this->logger);
+        $this->parseContent($result['content']);
 
         $this->output->writeln('Импорт завершен.');
         return Command::SUCCESS;
     }
 
     /**
-     * @param $url
-     * @return string|null
+     * @param string $url
+     * @return array
      */
-    private function getContent($url): ?string
+    private function getContent(string $url): array
     {
         $headers = [
             'Connection: keep-alive',
@@ -125,7 +104,10 @@ class ImportCommand extends Command
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_COOKIEFILE, 'cookie.txt');
         curl_setopt($ch, CURLOPT_COOKIEJAR, 'cookie.txt');
-        curl_setopt($ch, CURLOPT_POST, false);
+        curl_setopt($ch, CURLOPT_POST, true);
+        if ($this->method == 'GET') {
+            curl_setopt($ch, CURLOPT_POST, false);
+        }
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -133,19 +115,30 @@ class ImportCommand extends Command
         $html = curl_exec($ch);
         $ch_info = curl_getinfo($ch);
 
-        if (false === $html) {
-            echo 'Curl error : ' . curl_error($ch) . PHP_EOL;
-            $result = null;
-        } else {
-            $result = mb_substr($html, $ch_info['header_size']);
-            if (empty($result)) {
-                return null;
+        $responseCode = $ch_info['http_code'];
+        $responseBody = null;
+        $content = null;
+
+        if (!empty($html)) {
+            $responseBody = mb_substr($html, $ch_info['header_size']);
+            if ($responseCode == 200 && !empty($responseBody)) {
+                try {
+                    $content = gzdecode($responseBody);
+                } catch (Exception $e) {
+                }
+                if ($content) {
+                    $responseBody = $content;
+                }
             }
         }
 
         curl_close($ch);
 
-        return gzdecode($result);
+        return [
+            'content' => $content,
+            'responseCode' => $responseCode,
+            'responseBody' => $responseBody,
+        ];
     }
 
     /**
@@ -168,7 +161,6 @@ class ImportCommand extends Command
                         continue;
                     }
                     $data = $this->parseNode($dom);
-                    dump($data);
                     if (!empty($data)) {
                         try {
                             $this->saveToDb($data);

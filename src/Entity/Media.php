@@ -33,6 +33,14 @@ class Media
      */
     private $type;
 
+    /**
+     * @return mixed
+     */
+    public function __toString()
+    {
+        return $this->url;
+    }
+
     public function getId(): ?int
     {
         return $this->id;

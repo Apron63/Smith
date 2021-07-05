@@ -1,0 +1,15 @@
+{# @var ea \EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext #}
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block page_title 'Панель управления' %}
+
+{% block page_content %}
+    <style>
+        p {
+            max-width: 600px;
+        }
+    </style>
+    {% block main %}
+        Выберите пункт из меню слева
+    {% endblock %}
+{% endblock %}
